@@ -2856,6 +2856,9 @@ MODULES = {
         ),
     },
     "scipy": {
+        "signal": {
+            "convolve2d": ConstMethodIntr(),
+        },
         "special": {
             "gammaln": ConstFunctionIntr(
                 signature=_numpy_unary_op_float_signature
