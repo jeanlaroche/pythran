@@ -14,7 +14,6 @@ extern "C" {
 }
 #endif
 
-
 #define min(A, B) ((A < B) ? (A) : (B))
 #define max(A, B) ((A > B) ? (A) : (B))
 
@@ -91,9 +90,9 @@ namespace scipy
         }
     }
 
-    template <class A, class B>
+    template <class A, class B, typename U, typename V>
     types::ndarray<typename A::dtype, types::pshape<long, long>>
-    convolve2d(A const &inA, B const &inB)
+    convolve2d(A const &inA, B const &inB, U mode, V boundary)
     {
       auto shapeA = sutils::array(inA.shape());
       auto shapeB = sutils::array(inB.shape());
@@ -129,6 +128,27 @@ namespace scipy
       // std::cout << "DONE\n";
 
       return out;
+    }
+
+    template <class A, class B>
+    types::ndarray<typename A::dtype, types::pshape<long, long>>
+    convolve2d(A const &inA, B const &inB)
+    {
+      return convolve2d(inA, inB, "same","fill");
+    }
+
+    template <class A, class B, typename U>
+    types::ndarray<typename A::dtype, types::pshape<long, long>>
+    convolve2d(A const &inA, B const &inB, U mode)
+    {
+      return convolve2d(inA, inB, mode, "fill");
+    }
+
+    template <class A, class B, typename U, typename V, typename W>
+    types::ndarray<typename A::dtype, types::pshape<long, long>>
+    convolve2d(A const &inA, B const &inB, U mode, V boundary, W fillvalue)
+    {
+      return convolve2d(inA, inB, mode, boundary);
     }
 
     NUMPY_EXPR_TO_NDARRAY0_IMPL(convolve2d)

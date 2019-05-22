@@ -14,6 +14,18 @@ namespace scipy
       types::ndarray<typename A::dtype, types::pshape<long,long>>
       convolve2d(A const &inA, B const &inB);
 
+      template <class A, class B, typename U>
+      types::ndarray<typename A::dtype, types::pshape<long,long>>
+      convolve2d(A const &inA, B const &inB, U mode);
+
+      template <class A, class B, typename U, typename V>
+      types::ndarray<typename A::dtype, types::pshape<long,long>>
+      convolve2d(A const &inA, B const &inB, U mode, V boundary);
+
+      template <class A, class B, typename U, typename V, typename W>
+      types::ndarray<typename A::dtype, types::pshape<long,long>>
+      convolve2d(A const &inA, B const &inB, U mode, V boundary, W fillvalue);
+
       NUMPY_EXPR_TO_NDARRAY0_DECL(convolve2d)
       DEFINE_FUNCTOR(pythonic::scipy::signal, convolve2d)
   }
