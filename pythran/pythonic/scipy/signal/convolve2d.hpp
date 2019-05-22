@@ -6,6 +6,13 @@
 #include "pythonic/numpy/conjugate.hpp"
 #include "pythonic/numpy/asarray.hpp"
 #include "pythonic/types/ndarray.hpp"
+#if defined(PYTHRAN_BLAS_ATLAS) || defined(PYTHRAN_BLAS_SATLAS)
+extern "C" {
+#endif
+#include <cblas.h>
+#if defined(PYTHRAN_BLAS_ATLAS) || defined(PYTHRAN_BLAS_SATLAS)
+}
+#endif
 
 PYTHONIC_NS_BEGIN
 
@@ -26,6 +33,17 @@ namespace scipy
               out[i * m + j] +=
                   im[(i + k - r / 2) * m + (j + l - q / 2)] * kernel[k * q + l];
     }
+
+    void convoldot(double *im, double *kernel, double *out, unsigned n, unsigned m,
+                unsigned r, unsigned q) __attribute__((noinline))
+    {
+      for (unsigned k = 0; k < r; ++k)                 // loop over kernel cols
+       for (unsigned i = r / 2; i < n - r / 2; ++i) // loop over in cols
+        for (unsigned j = q / 2; j < m - q / 2; ++j) // loop over in rows
+              out[i * m + j] += cblas_ddot(q,im+(i + k - r / 2) * m + j - q / 2,1,kernel+k*q,1);
+    }
+
+
 
 #define min(A, B) ((A < B) ? (A) : (B))
 #define max(A, B) ((A > B) ? (A) : (B))
@@ -77,7 +95,11 @@ namespace scipy
       convol0(inA_.buffer, inB_.buffer, out.buffer, shapeA[0], shapeA[1],
               shapeB[0], shapeB[1]);
         std::cout << "CONV1\n";
+      if(1)
       convol(inA_.buffer, inB_.buffer, out.buffer, shapeA[0], shapeA[1],
+             shapeB[0], shapeB[1]);
+      else
+      convoldot(inA_.buffer, inB_.buffer, out.buffer, shapeA[0], shapeA[1],
              shapeB[0], shapeB[1]);
         std::cout << "DONE\n";
 
