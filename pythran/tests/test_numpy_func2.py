@@ -259,6 +259,18 @@ class TestNumpyFunc2(TestEnv):
                   numpy.arange(12,dtype=numpy.float32),
                   numpy.arange(7,dtype=float),
                   np_convolve_11=[NDArray[numpy.float32,:],NDArray[float,:]])
+                  
+    def test_convolve2d_1(self):
+        self.run_test("def convolve2d_1(a, b): from scipy.signal import convolve2d ; return convolve2d(a,b,'same')", 
+            numpy.ones((20,25)), numpy.ones((10,15)), convolve2d_1=[NDArray[float,:,:], NDArray[float,:,:]])
+                 
+    def test_convolve2d_2(self):
+        self.run_test("def convolve2d_2(a, b): from scipy.signal import convolve2d ; return convolve2d(a,b,'same')", 
+            numpy.ones((20,25)), numpy.ones((30,35)), convolve2d_2=[NDArray[float,:,:], NDArray[float,:,:]])
+                 
+    def test_convolve2d_3(self):
+        self.run_test("def convolve2d_3(a, b): from scipy.signal import convolve2d ; return convolve2d(a,b,'same')", 
+            numpy.ones((25,20)), numpy.ones((15,10)), convolve2d_3=[NDArray[float,:,:], NDArray[float,:,:]])
         
     def test_copy0(self):
         code= '''
