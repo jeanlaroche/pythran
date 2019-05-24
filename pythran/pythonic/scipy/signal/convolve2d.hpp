@@ -25,11 +25,11 @@ namespace scipy
   {
 
     // input of size a,b,c,d (b,c)=image, d = channel, a = batch
-    // kernel of size r,q,d,s (r,q)=image, d=channel_in, s=channel_out
+    // kernel of size s,r,q,d (r,q)=image, d=channel_in, s=channel_out
     // output of size a,b,c,s
     void convol_loop4D(double *im, double *kernel, double *out, unsigned a,
-                       unsigned b, unsigned c, unsigned d, unsigned r,
-                       unsigned q, unsigned s) __attribute__((noinline))
+                       unsigned b, unsigned c, unsigned d, unsigned s, unsigned r,
+                       unsigned q ) __attribute__((noinline))
     {
       for (unsigned m = 0; m < a; ++m)         // loop over input batch
         for (unsigned n = 0; n < d; ++n)       // loop over input channels
@@ -40,11 +40,11 @@ namespace scipy
                      ++i) // loop over in cols
                   for (unsigned j = q / 2; j < c - q / 2;
                        ++j) // loop over in rows
-                    // out[m,i,j,o] im[m,i+k-r/2,j+l-q/2,n] kernel[k,l,n,o]
+                    // out[m,i,j,o] im[m,i+k-r/2,j+l-q/2,n] kernel[o,k,l,n]
                     out[(b * c * s) * m + (c * s) * i + s * j + o] +=
                         im[(b * c * d) * m + (i + k - r / 2) * (c * d) +
                            (j + l - q / 2) * d + n] *
-                        kernel[(q * d * s) * k + (d * s) * l + s * n + o];
+                        kernel[(r*q*d) * o + (q*d) * k + d * l + n];
     }
 
     // n,m input (and output) dim
@@ -163,7 +163,7 @@ namespace scipy
 
       long NA = shapeA[0];
       long NB = shapeB[0];
-      auto shapeOut = types::pshape<long,long,long,long>(shapeA[0],shapeA[1],shapeA[2],shapeB[3]);
+      auto shapeOut = types::pshape<long,long,long,long>(shapeA[0],shapeA[1],shapeA[2],shapeB[0]);
       types::ndarray<typename A::dtype, types::pshape<long, long, long,long>> out = {
           shapeOut, (typename A::dtype)(0)};
 
@@ -174,7 +174,7 @@ namespace scipy
       auto c = inB_.buffer;
 
      convol_loop4D(inA_.buffer, inB_.buffer, out.buffer, shapeA[0], shapeA[1], shapeA[2], shapeA[3],
-                    shapeB[0], shapeB[1], shapeB[3]);
+                    shapeB[0], shapeB[1], shapeB[2]);
       // std::cout << "DONE\n";
 
       return out;
