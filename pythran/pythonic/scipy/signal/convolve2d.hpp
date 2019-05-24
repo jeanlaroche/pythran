@@ -28,13 +28,14 @@ namespace scipy
     // kernel of size s,r,q,d (r,q)=image, d=channel_in, s=channel_out
     // output of size a,b,c,s
     void convol_loop4D(double *im, double *kernel, double *out, int a, int b,
-                       int c, int d, int s, int r, int q)
+                       int c, int d, int s, int r, int q, int inci, int incj, int bout, int cout)
         __attribute__((noinline))
     {
-      for (int m = 0; m < a; ++m)       // loop over input batch
-        for (int o = 0; o < s; ++o)     // loop over output channels
-          for (int i = 0; i < b; ++i)   // loop over in cols
-            for (int j = 0; j < c; ++j) // loop over in rows
+      int ii, jj;
+      for (int m = 0; m < a; ++m)   // loop over input batch
+        for (int o = 0; o < s; ++o) // loop over output channels
+          for (int i = 0, ii = 0; i < b; i += inci, ++ii)   // loop over in cols
+            for (int j = 0, jj = 0; j < c; j += incj, ++jj) // loop over in rows
             {
               int kmin = (r - 1) / 2 - i >= 0 ? (r - 1) / 2 - i : 0;
               int kmax = b - i + (r - 1) / 2 < r ? b - i + (r - 1) / 2 : r;
@@ -56,7 +57,7 @@ namespace scipy
                 //                           (j + l - q / 2) * d + n] *
                 //                        kernel[(r * q * d) * o + (q * d) * k +
                 //                        d * l + n];
-                out[(b * c * s) * m + (c * s) * i + s * j + o] += cblas_ddot(
+                out[(bout * cout * s) * m + (cout * s) * ii + s * jj + o] += cblas_ddot(
                     d * (lmax - lmin),
                     im + (b * c * d) * m + (i + k - (r - 1) / 2) * (c * d) +
                         (j - (q - 1) / 2 + lmin) * d,
@@ -173,26 +174,29 @@ namespace scipy
 
     template <class A, class B>
     types::ndarray<typename A::dtype, types::pshape<long, long, long, long>>
-    convolve4d(A const &inA, B const &inB)
+    convolve4d(A const &inA, B const &inB,
+               types::ndarray<long, types::pshape<long>> const &increments)
     {
       auto shapeA = sutils::array(inA.shape());
       auto shapeB = sutils::array(inB.shape());
 
       long NA = shapeA[0];
       long NB = shapeB[0];
+      long outX = shapeA[1] / increments[1] + (shapeA[1] % increments[1] != 0);
+      long outY = shapeA[2] / increments[2] + (shapeA[2] % increments[2] != 0);
+      //outX = shapeA[1];
+      //outY = shapeA[2];
       auto shapeOut = types::pshape<long, long, long, long>(
-          shapeA[0], shapeA[1], shapeA[2], shapeB[0]);
+          shapeA[0], outX, outY, shapeB[0]);
       types::ndarray<typename A::dtype, types::pshape<long, long, long, long>>
           out = {shapeOut, (typename A::dtype)(0)};
 
       auto inA_ = numpy::functor::asarray{}(inA);
       auto inB_ = numpy::functor::asarray{}(inB);
-      auto a = out.buffer;
-      auto b = inA_.buffer;
-      auto c = inB_.buffer;
 
       convol_loop4D(inA_.buffer, inB_.buffer, out.buffer, shapeA[0], shapeA[1],
-                    shapeA[2], shapeA[3], shapeB[0], shapeB[1], shapeB[2]);
+                    shapeA[2], shapeA[3], shapeB[0], shapeB[1], shapeB[2],
+                    increments[1], increments[2],outX,outY);
       // std::cout << "DONE\n";
 
       return out;
@@ -209,9 +213,10 @@ namespace scipy
 
     template <class A, class B>
     types::ndarray<typename A::dtype, types::pshape<long, long, long, long>>
-    convolve2d(A const &inA, B const &inB, int mode)
+    convolve2d(A const &inA, B const &inB,
+               types::ndarray<long, types::pshape<long>> const &increments)
     {
-      return convolve4d(inA, inB);
+      return convolve4d(inA, inB, increments);
     }
 
     //    template <class A, class B, typename U>

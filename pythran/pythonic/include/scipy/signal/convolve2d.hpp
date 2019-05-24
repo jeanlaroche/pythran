@@ -12,7 +12,7 @@ namespace scipy
   {
       template <class A, class B>
       types::ndarray<typename A::dtype, types::pshape<long,long,long,long>>
-      convolve2d(A const &inA, B const &inB, int mode);
+      convolve2d(A const &inA, B const &inB, types::ndarray<long, types::pshape<long>> const &increments);
 
       template <class A, class B>
       types::ndarray<typename A::dtype, types::pshape<long,long>>
