@@ -10,6 +10,9 @@ namespace scipy
 {
   namespace signal
   {
+      // This is the equivalent of Conv2D in tensorflow. A is batch x size1 x size2 x nchannels_in
+      // B is nchannel_out x ksize1 x ksize2 x nchannels_in
+      // increments must be 1,inc1,inc2,1
       template <class A, class B>
       types::ndarray<typename A::dtype, types::pshape<long,long,long,long>>
       convolve2d(A const &inA, B const &inB, types::ndarray<long, types::pshape<long>> const &increments);

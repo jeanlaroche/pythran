@@ -28,14 +28,22 @@ namespace scipy
     // kernel of size s,r,q,d (r,q)=image, d=channel_in, s=channel_out
     // output of size a,b,c,s
     void convol_loop4D(double *im, double *kernel, double *out, int a, int b,
-                       int c, int d, int s, int r, int q, int inci, int incj, int bout, int cout)
-        __attribute__((noinline))
+                       int c, int d, int s, int r, int q, int inci, int incj,
+                       int bout, int cout) __attribute__((noinline))
     {
       int ii, jj;
+      // This logic is weird but is part of Conv2D. The idea is to make the
+      // middle of the original image, and the middle
+      // of the output image coincide. There's a weird adjustment in case kernel
+      // sizes are odd.
+      int istart = ((b - 1) - (bout - 1) * inci + r % 2) / 2;
+      int jstart = ((c - 1) - (cout - 1) * incj + q % 2) / 2;
       for (int m = 0; m < a; ++m)   // loop over input batch
         for (int o = 0; o < s; ++o) // loop over output channels
-          for (int i = 0, ii = 0; i < b; i += inci, ++ii)   // loop over in cols
-            for (int j = 0, jj = 0; j < c; j += incj, ++jj) // loop over in rows
+          for (int i = istart, ii = 0; i < b;
+               i += inci, ++ii) // loop over in cols
+            for (int j = jstart, jj = 0; j < c;
+                 j += incj, ++jj) // loop over in rows
             {
               int kmin = (r - 1) / 2 - i >= 0 ? (r - 1) / 2 - i : 0;
               int kmax = b - i + (r - 1) / 2 < r ? b - i + (r - 1) / 2 : r;
@@ -57,11 +65,13 @@ namespace scipy
                 //                           (j + l - q / 2) * d + n] *
                 //                        kernel[(r * q * d) * o + (q * d) * k +
                 //                        d * l + n];
-                out[(bout * cout * s) * m + (cout * s) * ii + s * jj + o] += cblas_ddot(
-                    d * (lmax - lmin),
-                    im + (b * c * d) * m + (i + k - (r - 1) / 2) * (c * d) +
-                        (j - (q - 1) / 2 + lmin) * d,
-                    1, kernel + (r * q * d) * o + (q * d) * k + lmin * d, 1);
+                out[(bout * cout * s) * m + (cout * s) * ii + s * jj + o] +=
+                    cblas_ddot(
+                        d * (lmax - lmin),
+                        im + (b * c * d) * m + (i + k - (r - 1) / 2) * (c * d) +
+                            (j - (q - 1) / 2 + lmin) * d,
+                        1, kernel + (r * q * d) * o + (q * d) * k + lmin * d,
+                        1);
               }
             }
     }
@@ -184,10 +194,10 @@ namespace scipy
       long NB = shapeB[0];
       long outX = shapeA[1] / increments[1] + (shapeA[1] % increments[1] != 0);
       long outY = shapeA[2] / increments[2] + (shapeA[2] % increments[2] != 0);
-      //outX = shapeA[1];
-      //outY = shapeA[2];
-      auto shapeOut = types::pshape<long, long, long, long>(
-          shapeA[0], outX, outY, shapeB[0]);
+      // outX = shapeA[1];
+      // outY = shapeA[2];
+      auto shapeOut = types::pshape<long, long, long, long>(shapeA[0], outX,
+                                                            outY, shapeB[0]);
       types::ndarray<typename A::dtype, types::pshape<long, long, long, long>>
           out = {shapeOut, (typename A::dtype)(0)};
 
@@ -196,7 +206,7 @@ namespace scipy
 
       convol_loop4D(inA_.buffer, inB_.buffer, out.buffer, shapeA[0], shapeA[1],
                     shapeA[2], shapeA[3], shapeB[0], shapeB[1], shapeB[2],
-                    increments[1], increments[2],outX,outY);
+                    increments[1], increments[2], outX, outY);
       // std::cout << "DONE\n";
 
       return out;
