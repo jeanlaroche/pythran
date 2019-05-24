@@ -24,6 +24,29 @@ namespace scipy
   namespace signal
   {
 
+    // input of size a,b,c,d (b,c)=image, d = channel, a = batch
+    // kernel of size r,q,d,s (r,q)=image, d=channel_in, s=channel_out
+    // output of size a,b,c,s
+    void convol_loop4D(double *im, double *kernel, double *out, unsigned a,
+                       unsigned b, unsigned c, unsigned d, unsigned r,
+                       unsigned q, unsigned s) __attribute__((noinline))
+    {
+      for (unsigned m = 0; m < a; ++m)         // loop over input batch
+        for (unsigned n = 0; n < d; ++n)       // loop over input channels
+          for (unsigned o = 0; o < s; ++o)     // loop over output channels
+            for (unsigned k = 0; k < r; ++k)   // loop over kernel cols
+              for (unsigned l = 0; l < q; ++l) // loop over kernel rows
+                for (unsigned i = r / 2; i < b - r / 2;
+                     ++i) // loop over in cols
+                  for (unsigned j = q / 2; j < c - q / 2;
+                       ++j) // loop over in rows
+                    // out[m,i,j,o] im[m,i+k-r/2,j+l-q/2,n] kernel[k,l,n,o]
+                    out[(b * c * s) * m + (c * s) * i + s * j + o] +=
+                        im[(b * c * d) * m + (i + k - r / 2) * (c * d) +
+                           (j + l - q / 2) * d + n] *
+                        kernel[(q * d * s) * k + (d * s) * l + s * n + o];
+    }
+
     // n,m input (and output) dim
     // r,q kernel dim
     // Use this if r and q are both small
@@ -109,8 +132,8 @@ namespace scipy
       auto c = inB_.buffer;
 
       // std::cout << "CONV0\n";
-      convol_edge(inA_.buffer, inB_.buffer, out.buffer, shapeA[0], shapeA[1],
-                  shapeB[0], shapeB[1]);
+      //convol_edge(inA_.buffer, inB_.buffer, out.buffer, shapeA[0], shapeA[1],
+      //            shapeB[0], shapeB[1]);
       // std::cout << "CONV1\n";
 
       // Using cblas for the dot product is only good if the kernel size is
@@ -130,26 +153,63 @@ namespace scipy
       return out;
     }
 
+
+        template <class A, class B>
+    types::ndarray<typename A::dtype, types::pshape<long, long, long, long>>
+    convolve4d(A const &inA, B const &inB)
+    {
+      auto shapeA = sutils::array(inA.shape());
+      auto shapeB = sutils::array(inB.shape());
+
+      long NA = shapeA[0];
+      long NB = shapeB[0];
+      auto shapeOut = types::pshape<long,long,long,long>(shapeA[0],shapeA[1],shapeA[2],shapeB[3]);
+      types::ndarray<typename A::dtype, types::pshape<long, long, long,long>> out = {
+          shapeOut, (typename A::dtype)(0)};
+
+      auto inA_ = numpy::functor::asarray{}(inA);
+      auto inB_ = numpy::functor::asarray{}(inB);
+      auto a = out.buffer;
+      auto b = inA_.buffer;
+      auto c = inB_.buffer;
+
+     convol_loop4D(inA_.buffer, inB_.buffer, out.buffer, shapeA[0], shapeA[1], shapeA[2], shapeA[3],
+                    shapeB[0], shapeB[1], shapeB[3]);
+      // std::cout << "DONE\n";
+
+      return out;
+    }
+
+
+    ///////////////////////////////////////////////////////////////////
+
     template <class A, class B>
     types::ndarray<typename A::dtype, types::pshape<long, long>>
     convolve2d(A const &inA, B const &inB)
     {
-      return convolve2d(inA, inB, "same","fill");
+      return convolve2d(inA, inB, "same", "fill");
     }
 
-    template <class A, class B, typename U>
-    types::ndarray<typename A::dtype, types::pshape<long, long>>
-    convolve2d(A const &inA, B const &inB, U mode)
+    template <class A, class B>
+    types::ndarray<typename A::dtype, types::pshape<long, long, long, long>>
+    convolve2d(A const &inA, B const &inB, int mode)
     {
-      return convolve2d(inA, inB, mode, "fill");
+      return convolve4d(inA, inB);
     }
 
-    template <class A, class B, typename U, typename V, typename W>
-    types::ndarray<typename A::dtype, types::pshape<long, long>>
-    convolve2d(A const &inA, B const &inB, U mode, V boundary, W fillvalue)
-    {
-      return convolve2d(inA, inB, mode, boundary);
-    }
+//    template <class A, class B, typename U>
+//    types::ndarray<typename A::dtype, types::pshape<long, long>>
+//    convolve2d(A const &inA, B const &inB, U mode)
+//    {
+//      return convolve2d(inA, inB, mode, "fill");
+//    }
+//
+//    template <class A, class B, typename U, typename V, typename W>
+//    types::ndarray<typename A::dtype, types::pshape<long, long>>
+//    convolve2d(A const &inA, B const &inB, U mode, V boundary, W fillvalue)
+//    {
+//      return convolve2d(inA, inB, mode, boundary);
+//    }
 
     NUMPY_EXPR_TO_NDARRAY0_IMPL(convolve2d)
   }
