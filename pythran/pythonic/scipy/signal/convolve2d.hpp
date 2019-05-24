@@ -31,17 +31,17 @@ namespace scipy
                        int c, int d, int s, int r, int q)
         __attribute__((noinline))
     {
-      for (int m = 0; m < a; ++m)                   // loop over input batch
-        for (int o = 0; o < s; ++o)                 // loop over output channels
-          for (int i = 0; i < b; ++i)               // loop over in cols
-            for (int j =0; j < c; ++j) // loop over in rows
+      for (int m = 0; m < a; ++m)       // loop over input batch
+        for (int o = 0; o < s; ++o)     // loop over output channels
+          for (int i = 0; i < b; ++i)   // loop over in cols
+            for (int j = 0; j < c; ++j) // loop over in rows
             {
-              int kmin = r / 2 - i >= 0 ? r / 2 - i : 0;
-              int kmax = b - i + r / 2 < r ? b - i + r / 2 : r;
+              int kmin = (r - 1) / 2 - i >= 0 ? (r - 1) / 2 - i : 0;
+              int kmax = b - i + (r - 1) / 2 < r ? b - i + (r - 1) / 2 : r;
               for (int k = kmin; k < kmax; ++k) // loop over kernel cols
               {
-                  int lmin = q / 2 - j >= 0 ? q / 2 - j : 0;
-                  int lmax = c - j + q / 2 < q ? c - j + q / 2 : q;
+                int lmin = (q - 1) / 2 - j >= 0 ? (q - 1) / 2 - j : 0;
+                int lmax = c - j + (q - 1) / 2 < q ? c - j + (q - 1) / 2 : q;
 
                 //                for (unsigned l = 0; l < q; ++l)   // loop
                 //                over kernel rows
@@ -57,9 +57,10 @@ namespace scipy
                 //                        kernel[(r * q * d) * o + (q * d) * k +
                 //                        d * l + n];
                 out[(b * c * s) * m + (c * s) * i + s * j + o] += cblas_ddot(
-                    d * (lmax-lmin), im + (b * c * d) * m + (i + k - r / 2) * (c * d) +
-                               (j - q / 2 + lmin) * d,
-                    1, kernel + (r * q * d) * o + (q * d) * k + lmin*d, 1);
+                    d * (lmax - lmin),
+                    im + (b * c * d) * m + (i + k - (r - 1) / 2) * (c * d) +
+                        (j - (q - 1) / 2 + lmin) * d,
+                    1, kernel + (r * q * d) * o + (q * d) * k + lmin * d, 1);
               }
             }
     }
