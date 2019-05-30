@@ -23,57 +23,52 @@ namespace scipy
 {
   namespace signal
   {
-
-    // input of size a,b,c,d (b,c)=image, d = channel, a = batch
-    // kernel of size s,r,q,d (r,q)=image, d=channel_in, s=channel_out
-    // output of size a,b,c,s
-    void convol_loop4D(double *im, double *kernel, double *out, int a, int b,
-                       int c, int d, int s, int r, int q, int inci, int incj,
-                       int bout, int cout) __attribute__((noinline))
+    // input of size a,sI,sJ,d (b,c)=image, d = channel, a = batch
+    // kernel of size s,si,sj,d (si,sj)=image, d=channel_in, s=channel_out
+    // output of size a,soi,soj,s
+    // This is a direct implementation of the Conv2D function from tfdeploy. It
+    // uses cblas_ddot to collapse the two inner loops (over the output
+    // channels, and
+    // the kernel inner dimension).
+    void convol_loop4D(double *im, double *kernel, double *out, int a, int sI,
+                       int sJ, int d, int s, int si, int sj, int inci, int incj,
+                       int soi, int soj) __attribute__((noinline))
     {
-      int ii, jj;
-      // This logic is weird but is part of Conv2D. The idea is to make the
-      // middle of the original image, and the middle
-      // of the output image coincide. There's a weird adjustment in case kernel
-      // sizes are odd.
-      int istart = ((b - 1) - (bout - 1) * inci + r % 2) / 2;
-      int jstart = ((c - 1) - (cout - 1) * incj + q % 2) / 2;
-      for (int m = 0; m < a; ++m)   // loop over input batch
-        for (int o = 0; o < s; ++o) // loop over output channels
-          for (int i = istart, ii = 0; i < b;
-               i += inci, ++ii) // loop over in cols
-            for (int j = jstart, jj = 0; j < c;
-                 j += incj, ++jj) // loop over in rows
-            {
-              int kmin = (r - 1) / 2 - i >= 0 ? (r - 1) / 2 - i : 0;
-              int kmax = b - i + (r - 1) / 2 < r ? b - i + (r - 1) / 2 : r;
-              for (int k = kmin; k < kmax; ++k) // loop over kernel cols
-              {
-                int lmin = (q - 1) / 2 - j >= 0 ? (q - 1) / 2 - j : 0;
-                int lmax = c - j + (q - 1) / 2 < q ? c - j + (q - 1) / 2 : q;
+      int ipad = ((soi - 1) * inci + si - sI) / 2;
+      if (ipad < 0)
+        ipad = 0;
+      int jpad = ((soj - 1) * incj + sj - sJ) / 2;
+      if (jpad < 0)
+        jpad = 0;
 
-                //                for (unsigned l = 0; l < q; ++l)   // loop
-                //                over kernel rows
-                //                  for (unsigned n = 0; n < d; ++n) // loop
-                //                  over input channels
-                // out[m,i,j,o] im[m,i+k-r/2,j+l-q/2,n] kernel[o,k,l,n]
-                // -> replace with a dot over n (in chan) and l
-                //                    out[(b * c * s) * m + (c * s) * i + s * j
-                //                    + o] +=
-                //                        im[(b * c * d) * m + (i + k - r / 2) *
-                //                        (c * d) +
-                //                           (j + l - q / 2) * d + n] *
-                //                        kernel[(r * q * d) * o + (q * d) * k +
-                //                        d * l + n];
-                out[(bout * cout * s) * m + (cout * s) * ii + s * jj + o] +=
-                    cblas_ddot(
-                        d * (lmax - lmin),
-                        im + (b * c * d) * m + (i + k - (r - 1) / 2) * (c * d) +
-                            (j - (q - 1) / 2 + lmin) * d,
-                        1, kernel + (r * q * d) * o + (q * d) * k + lmin * d,
-                        1);
-              }
+      for (int b = 0; b < a; b++)
+        for (int i = 0; i < soi; i++) {
+          int starti = 0;
+          int ui = inci * i - ipad;
+          if (ui < 0) {
+            starti = ipad - inci * i;
+            ui = 0;
+          }
+          int endi = si < sI - ui + starti ? si : sI - ui + starti;
+          for (int j = 0; j < soj; j++) {
+            int startj = 0;
+            int uj = incj * j - jpad;
+            if (uj < 0) {
+              startj = jpad - incj * j;
+              uj = 0;
             }
+            int endj = sj < sJ - uj + startj ? sj : sJ - uj + startj;
+            for (int k = 0; k < s; k++)
+              for (int iii = ui; iii < ui + endi - starti; iii++) {
+                out[b * soi * soj * s + i * soj * s + j * s + k] +=
+                    cblas_ddot(d * (endj - startj),
+                               im + b * sI * sJ * d + iii * sJ * d + uj * d, 1,
+                               kernel + k * si * sj * d +
+                                   (starti + iii - ui) * sj * d + startj * d,
+                               1);
+              }
+          }
+        }
     }
 
     // n,m input (and output) dim
