@@ -97,6 +97,14 @@ namespace numpy
       auto tmp_array = _copy_to_double(in_array);
       return r2c(tmp_array, n, axis, norm, true, false);
     }
+  
+    template <class T, class pS, class pS2>
+    std::enable_if<std::is_floating_point<T>::value,void>
+    rfft(types::ndarray<T, pS> const &input, types::ndarray<std::complex<T>, pS2> &output, long n, long axis)
+    {
+      r2cIP(input, output, n, axis, true, false);
+    }
+
 
     NUMPY_EXPR_TO_NDARRAY0_IMPL(rfft);
   }

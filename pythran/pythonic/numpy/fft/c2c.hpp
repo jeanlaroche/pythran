@@ -303,6 +303,67 @@ namespace numpy
       }
       return out_array;
     }
+  
+  template <class T, class pS, class pS2>
+  std::enable_if<std::is_floating_point<T>::value,void>
+  r2cIP(types::ndarray<T, pS> const &in_array, types::ndarray<std::complex<T>, pS2> &out_array, long n, long axis,
+        bool forward, bool extend = true)
+  {
+    std::cout << "R2CIP\n";
+    auto constexpr N = std::tuple_size<pS>::value;
+    Inorm inorm = Inorm::forward;
+    if (axis < 0)
+      axis = N + axis;
+    auto in_shape = sutils::getshape(in_array);
+    long npts = in_shape[axis];
+    if (n == -1)
+      n = npts;
+    auto out_shape = sutils::getshape(in_array);
+    if (extend) {
+      out_shape[axis] = n;
+    } else {
+      out_shape[axis] = n / 2 + 1;
+    }
+    T *d_in;
+    types::ndarray<T, types::array<long, std::tuple_size<pS>::value>>
+        extended_array;
+    shape_t shapes = shape_t(size_t(N));
+    stride_t in_strides;
+    if (n > npts) {
+      // extend array with zeros along axis direction
+      extended_array = _pad_in_array(in_array, axis, n - npts);
+      auto ext_shape = sutils::getshape(extended_array);
+      std::copy(ext_shape.begin(), ext_shape.begin() + N, shapes.begin());
+      d_in = reinterpret_cast<T *>(extended_array.buffer);
+      in_strides = create_strides(extended_array);
+    } else {
+      d_in = reinterpret_cast<T *>(in_array.buffer);
+      in_shape[axis] = n;
+      std::copy(in_shape.begin(), in_shape.begin() + N, shapes.begin());
+      in_strides = create_strides(
+          in_array); // for cropped arrays we need to use different strides
+    }
+    auto d_out = reinterpret_cast<std::complex<T> *>(out_array.buffer);
+    // axes calculation is for 1D transform
+    shape_t axes = shape_t(1);
+    axes[0] = axis;
+    auto out_strides = create_strides(out_array);
+    auto fct = norm_fct<T>(inorm, shapes, axes);
+    pocketfft::r2c(shapes, in_strides, out_strides, axes, forward, d_in,
+                   d_out, fct, size_t(0));
+
+    if (extend) {
+      using namespace pocketfft::detail;
+      ndarr<std::complex<T>> ares(out_array.buffer, shapes, out_strides);
+      rev_iter iter(ares, axes);
+      while (iter.remaining() > 0) {
+        auto v = ares[iter.ofs()];
+        ares[iter.rev_ofs()] = conj(v);
+        iter.advance();
+      }
+    }
+  }
+  
   }
 }
 PYTHONIC_NS_END
